@@ -153,8 +153,11 @@ final class BrowserViewController: UIViewController {
         let script: String = {
             switch value {
             case .success(let result):
+                //hhh2 already handled with null. Maybe it's good enough?
+                NSLog("xxx firing completion with success")
                 return "executeCallback(\(callbackID), null, \"\(result.value.object)\")"
             case .failure(let error):
+                NSLog("xxx firing completion with failure")
                 return "executeCallback(\(callbackID), \"\(error.message)\", null)"
             }
         }()
@@ -237,11 +240,15 @@ extension BrowserViewController: WKNavigationDelegate {
 }
 
 extension BrowserViewController: WKScriptMessageHandler {
+    //hhh2 make sure we handle both DappCommand and WalletCommand
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        NSLog("xxx message1: \(message)")
         guard let command = DappAction.fromMessage(message) else { return }
+        NSLog("xxx message2: \(command)")
         let requester = DAppRequester(title: webView.title, url: webView.url)
         let token = TokensDataStore.token(forServer: server)
         let action = DappAction.fromCommand(command, server: server, transactionType: .dapp(token, requester))
+        NSLog("xxx action: \(action)")
 
         delegate?.didCall(action: action, callbackID: command.id, inBrowserViewController: self)
     }

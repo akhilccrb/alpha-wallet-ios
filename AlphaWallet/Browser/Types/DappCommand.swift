@@ -2,10 +2,45 @@
 
 import Foundation
 
+//hhh2 rename?
 struct DappCommand: Decodable {
     let name: Method
     let id: Int
     let object: [String: DappCommandObjectValue]
+}
+
+struct WalletCommand: Decodable {
+    enum Method: String, Decodable {
+        case walletAddEthereumChain
+
+        init?(string: String) {
+            if let s = Method(rawValue: string) {
+                self = s
+            } else {
+                return nil
+            }
+        }
+    }
+
+    let name: Method
+    let id: Int
+    let object: WalletAddEthereumChainObject
+}
+
+//hhh2 rename?
+enum DappOrWalletCommand {
+    case eth(DappCommand)
+    //TODO we'll have to see how to expand this, do we add more cases when there are more walletXXX object types, or do we generalize them?
+    case walletAddEthereumChain(WalletCommand)
+
+    var id: Int {
+        switch self {
+        case .eth(let command):
+            return command.id
+        case .walletAddEthereumChain(let command):
+            return command.id
+        }
+    }
 }
 
 struct DappCallback {
@@ -21,6 +56,8 @@ enum DappCallbackValue {
     case signTypedMessage(Data)
     case signTypedMessageV3(Data)
     case ethCall(String)
+    //hhh2 change. Handle error too?
+    case walletAddEthereumChain
 
     var object: String {
         switch self {
@@ -38,6 +75,9 @@ enum DappCallbackValue {
             return data.hexEncoded
         case .ethCall(let value):
             return value
+        //hhh2 implement success and error. How to show success=null?
+        case .walletAddEthereumChain:
+            return ""
         }
     }
 }
@@ -72,4 +112,19 @@ struct DappCommandObjectValue: Decodable {
             eip712v3And4Data = nil
         }
     }
+}
+
+struct WalletAddEthereumChainObject: Decodable {
+    struct NativeCurrency: Decodable {
+        let name: String
+        let symbol: String
+        let decimals: Int
+    }
+
+    let nativeCurrency: NativeCurrency?
+    let blockExplorerUrls: [String]?
+    let chainName: String?
+    let chainType: String?
+    let chainId: String
+    let rpcUrls: [String]?
 }

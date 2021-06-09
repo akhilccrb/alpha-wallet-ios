@@ -10,6 +10,8 @@ enum Method: String, Decodable {
     case signMessage
     case signTypedMessage
     case ethCall
+    //hhh2 might remove this, not in method here?
+    //case walletAddEthereumChain
     case unknown
 
     init(string: String) {

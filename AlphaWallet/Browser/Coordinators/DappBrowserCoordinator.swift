@@ -446,6 +446,15 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
             let from = AlphaWallet.Address(uncheckedAgainstNullAddress: from)
             let to = AlphaWallet.Address(uncheckedAgainstNullAddress: to)
             ethCall(callbackID: callbackID, from: from, to: to, data: data, server: server)
+        case .walletAddEthereumChain:
+            //hhh3 handle walletAddEthereumChain. Show UI etc
+            NSLog("xxx handle walletAddEthereumChain, show UI etc")
+
+            //hhh remove
+            let callback = DappCallback(id: callbackID, value: .walletAddEthereumChain)
+            //hhh2 handle error? If error, it's .failture
+            browserViewController.notifyFinish(callbackID: callbackID, value: .success(callback))
+
         case .unknown, .sendRawTransaction:
             break
         }
