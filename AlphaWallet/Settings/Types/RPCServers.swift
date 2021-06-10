@@ -624,6 +624,8 @@ enum RPCServer: Hashable, CaseIterable {
         }
     }
 
+    //hhh1 maybe just loop through and match will do?
+    //hhh1 add a testcase to make sure when adding new cases, this is updated too
     init(name: String) {
         self = {
             switch name {
@@ -641,7 +643,8 @@ enum RPCServer: Hashable, CaseIterable {
             case RPCServer.artis_tau1.name: return .artis_tau1
             case RPCServer.binance_smart_chain.name: return .binance_smart_chain
             case RPCServer.binance_smart_chain_testnet.name: return .binance_smart_chain_testnet
-            case RPCServer.heco.name: return .heco
+                    //case RPCServer.heco.chainID: return .heco
+            //case RPCServer.heco.name: return .heco
             case RPCServer.heco_testnet.name: return .heco_testnet
             case RPCServer.fantom.name: return .fantom
             case RPCServer.fantom_testnet.name: return .fantom_testnet
@@ -651,12 +654,15 @@ enum RPCServer: Hashable, CaseIterable {
             case RPCServer.mumbai_testnet.name: return .mumbai_testnet
             case RPCServer.optimistic.name: return .optimistic
             case RPCServer.optimisticKovan.name: return .optimisticKovan
-                    //hhh3 maybe here too!
-            default: return .main
+                    //hhh1 maybe here too!
+            default:
+                return RPCServer.servers.first { $0.name == name } ?? .main
             }
         }()
     }
 
+    //hhh1 maybe just loop through and match will do?
+    //hhh1 add a testcase to make sure when adding new cases, this is updated too
     init(chainID: Int) {
         self = {
             switch chainID {
@@ -674,7 +680,8 @@ enum RPCServer: Hashable, CaseIterable {
             case RPCServer.artis_tau1.chainID: return .artis_tau1
             case RPCServer.binance_smart_chain.chainID: return .binance_smart_chain
             case RPCServer.binance_smart_chain_testnet.chainID: return .binance_smart_chain_testnet
-            case RPCServer.heco.chainID: return .heco
+                    //hhh1 enable again after dev against dapp
+            //case RPCServer.heco.chainID: return .heco
             case RPCServer.heco_testnet.chainID: return .heco_testnet
             case RPCServer.fantom.chainID: return .fantom
             case RPCServer.fantom_testnet.chainID: return .fantom_testnet
@@ -684,8 +691,9 @@ enum RPCServer: Hashable, CaseIterable {
             case RPCServer.mumbai_testnet.chainID: return .mumbai_testnet
             case RPCServer.optimistic.chainID: return .optimistic
             case RPCServer.optimisticKovan.chainID: return .optimisticKovan
-                    //hhh3 here
-            default: return .main
+                    //hhh1 here
+            default:
+                return RPCServer.servers.first { $0.chainID == chainID } ?? .main
             }
         }()
     }

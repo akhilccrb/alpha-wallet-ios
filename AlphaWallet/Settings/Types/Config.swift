@@ -171,10 +171,10 @@ struct Config {
         get {
             if let chainIds = defaults.array(forKey: Keys.enabledServers) as? [Int] {
                 //hhh restore
-                return chainIds.map { .init(chainID: $0) }
+                //return chainIds.map { .init(chainID: $0) }
                 //hhh remove. And maybe change?
                 //NSLog("xxx custom servers: \(RPCServer.servers)")
-                //return chainIds.map{ .init(chainID: $0) } + RPCServer.servers
+                return chainIds.map{ .init(chainID: $0) } + RPCServer.servers
             } else {
                 return Constants.defaultEnabledServers
             }

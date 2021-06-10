@@ -24,6 +24,8 @@ final class DappBrowserCoordinator: NSObject, Coordinator {
     private let keystore: Keystore
     private let config: Config
     private let analyticsCoordinator: AnalyticsCoordinator
+    //hhh3 keep or? Not tracking callbackId to see if it's the same? Will callbackId be generated randomly so it wouldn't clash?
+    private var addCustomChain: (chain: AddCustomChain, callbackId: Int)?
     private var browserNavBar: DappBrowserNavigationBar? {
         return navigationController.navigationBar as? DappBrowserNavigationBar
     }
@@ -447,24 +449,30 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
             let to = AlphaWallet.Address(uncheckedAgainstNullAddress: to)
             ethCall(callbackID: callbackID, from: from, to: to, data: data, server: server)
         case .walletAddEthereumChain(let customChain):
-            //hhh3 handle walletAddEthereumChain. Show UI etc
-            NSLog("xxx handle walletAddEthereumChain, show UI etc")
-            //hhh3 figure out etherscanCompatibleType
-            //hhh3 ask about isTestNet too
-            //hhh3 what about chain name?
-            //hhh3 if we use drop0x, we should check if it's there first? If it's not, assume base-10
-            //hhh forced unwrap
-            //hhh3 what if no RPC provided in the dapp's walletAddEthereumChain call?
-            let chainId: Int = Int(customChain.chainId.drop0x, radix: 16)!
-            let customRPC = CustomRPC(chainID: chainId, nativeCryptoTokenName: customChain.nativeCurrency?.name, chainName: customChain.chainName ?? "Unknown", symbol: customChain.nativeCurrency?.symbol, rpcEndpoint: customChain.rpcUrls!.first!, explorerEndpoint: customChain.blockExplorerUrls?.first, etherscanCompatibleType: .blockscout, isTestNet: false)
-            RPCServer.servers.append(RPCServer.custom(customRPC))
-            NSLog("xxx servers now: \(RPCServer.servers)")
+            //hhh3 enable the chain for the user automatically will force restart of the UI... (then we switch to it, or not, for the browser?)
+            let customChainId = Int(chainId0xString: customChain.chainId)
+            if ServersCoordinator.serversOrdered.contains(where: { $0.chainID == customChainId }) {
+                guard let addCustomChain = addCustomChain else { return }
+                //hhh3 must not restart UI if already active though. But if it is already present, but not active, must prompt user to switch
+                notifyAddCustomChainSucceeded(in: addCustomChain.chain)
+                return
+            }
 
-            //hhh replace with actual
-            let callback = DappCallback(id: callbackID, value: .walletAddEthereumChain)
-            //hhh2 handle error? If error, it's .failture
-            browserViewController.notifyFinish(callbackID: callbackID, value: .success(callback))
-
+            UIAlertController.alert(title: "Add the custom chain with ID: \(customChain.chainId)? The app session will restart with the chain enabled.",
+                    message: nil,
+                    alertButtonTitles: [R.string.localizable.addButtonTitle(), R.string.localizable.cancel()],
+                    alertButtonStyles: [.destructive, .cancel],
+                    viewController: viewController,
+                    completion: { [self] choice in
+                        NSLog("xxx choice: \(choice)")
+                        guard choice == 0 else { return }
+                        NSLog("xxx adding chain")
+                        //hhh3 does this get destroyed before completion?
+                        let addCustomChain = AddCustomChain(customChain)
+                        addCustomChain.delegate = self
+                        addCustomChain.run()
+                        self.addCustomChain = (chain: addCustomChain, callbackId: callbackID)
+                    })
         case .unknown, .sendRawTransaction:
             break
         }
@@ -819,5 +827,29 @@ extension DappBrowserCoordinator {
 
     private func logEnterUrl() {
         analyticsCoordinator.log(action: Analytics.Action.enterUrl)
+    }
+}
+
+extension DappBrowserCoordinator: AddCustomChainDelegate {
+    func notifyAddCustomChainSucceeded(in addCustomChain: AddCustomChain) {
+        guard let addCustomChain = self.addCustomChain else {
+            NSLog("xxx delegate fired, but no addCustomChain object")
+            return
+        }
+        //hhh3 must test if chain is already added/supported, what happens? We shouldn't trigger a restart
+        let callback = DappCallback(id: addCustomChain.callbackId, value: .walletAddEthereumChain)
+        browserViewController.notifyFinish(callbackID: addCustomChain.callbackId, value: .success(callback))
+        self.addCustomChain = nil
+        //hhh3 if not already enabled, enable the chain and restart. Delegate should switch browser to the chain too, but will it crash? Probably not because only browser Unless we still get balance?
+    }
+
+    func notifyAddCustomChainFailed(error: DAppError, in addCustomChain: AddCustomChain) {
+        guard let addCustomChain = self.addCustomChain else {
+            NSLog("xxx delegate fired, but no addCustomChain object")
+            return
+        }
+        let callback = DappCallback(id: addCustomChain.callbackId, value: .walletAddEthereumChain)
+        browserViewController.notifyFinish(callbackID: addCustomChain.callbackId, value: .failure(error))
+        self.addCustomChain = nil
     }
 }

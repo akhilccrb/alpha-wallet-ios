@@ -9,10 +9,10 @@ protocol ServersCoordinatorDelegate: class {
 }
 
 class ServersCoordinator: Coordinator {
-    //hhh3 probably can't be a let since it's dynamic now? Even if it's saved, it can change during runtime without killing app
+    //hhh1 probably can't be a let since it's dynamic now? Even if it's saved, it can change during runtime without killing app
     //static let serversOrdered: [RPCServer] = [
     static var serversOrdered: [RPCServer] {
-        //hhh3 enable them again
+        //hhh1 enable them again
         [
             .main,
             //.xDai,
