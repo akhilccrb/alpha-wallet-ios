@@ -466,31 +466,43 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                         NSLog("xxx already have this chain active for browser: \(customChainId). So do nothing else")
                     } else {
                         //hhh4 replace instruction to do it automatically for users
+                        //hhh4 change the success/failure call based on user choice
                         NSLog("xxx NOT have this chain active for browser: \(customChainId)")
-                        let title = "In order to use this dapp, you should go to tap ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
-                        UIAlertController.alert(title: title,
-                                message: nil,
-                                alertButtonTitles: [R.string.localizable.oK()],
-                                alertButtonStyles: [.default],
-                                viewController: viewController,
-                                completion: nil)
+                        //let title = "In order to use this dapp, you should go to tap ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
+                        //UIAlertController.alert(title: title,
+                        //        message: nil,
+                        //        alertButtonTitles: [R.string.localizable.oK()],
+                        //        alertButtonStyles: [.default],
+                        //        viewController: viewController,
+                        //        completion: nil)
                     }
                 } else {
                     NSLog("xxx already have this chain but NOT enabled: \(customChainId)")
                     notifyAddCustomChainSucceeded(in: .init(customChain))
                     //hhh4 replace instruction to do it automatically for users
+                    //hhh4 change the success/failure call based on user choice
                     let title = "In order to use this dapp, you should go to Settings tab > Select Active Networks and enable \(existingServer.displayName) and then Browser tab > ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
+                    hhh4 install app, import 0x007 and test
                     UIAlertController.alert(title: title,
                             message: nil,
-                            alertButtonTitles: [R.string.localizable.oK()],
+                            alertButtonTitles: [R.string.localizable.oK(), R.string.localizable.cancel()],
                             alertButtonStyles: [.default],
                             viewController: viewController,
-                            completion: nil)
+                            completion: { [self] choice in
+                                NSLog("xxx choice: \(choice)")
+                                if choice == 0 {
+                                    NSLog("xxx so need to enable network and switch browser")
+                                } else {
+                                    NSLog("xxx cancelled")
+                                    //hhh4 fire error that user cancelled
+                                }
+                            })
                 }
                 return
             } else {
                 NSLog("xxx here 2")
 
+                //hhh4 also need to enable chain and switch in browser like above
                 UIAlertController.alert(title: "Add the custom chain with ID: \(customChain.chainId)? The app session will restart with the chain enabled.",
                         message: nil,
                         alertButtonTitles: [R.string.localizable.addButtonTitle(), R.string.localizable.cancel()],
