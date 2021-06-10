@@ -121,10 +121,12 @@ struct WalletAddEthereumChainObject: Decodable {
         let decimals: Int
     }
 
+    //hhh3 rename this to nativeCryptoCurrency
     let nativeCurrency: NativeCurrency?
     let blockExplorerUrls: [String]?
     let chainName: String?
     let chainType: String?
+    //hhh3 force this to be Int when parsing? Otherwise fail. Is it worth it? Can the built-in "decoder" do it?
     let chainId: String
     let rpcUrls: [String]?
 }

@@ -6,6 +6,9 @@ import BigInt
 
 // swiftlint:disable type_body_length
 enum RPCServer: Hashable, CaseIterable {
+    //hhh remove
+    static var servers: [Self] = .init()
+
     case main
     case kovan
     case ropsten
@@ -648,6 +651,7 @@ enum RPCServer: Hashable, CaseIterable {
             case RPCServer.mumbai_testnet.name: return .mumbai_testnet
             case RPCServer.optimistic.name: return .optimistic
             case RPCServer.optimisticKovan.name: return .optimisticKovan
+                    //hhh3 maybe here too!
             default: return .main
             }
         }()
@@ -680,6 +684,7 @@ enum RPCServer: Hashable, CaseIterable {
             case RPCServer.mumbai_testnet.chainID: return .mumbai_testnet
             case RPCServer.optimistic.chainID: return .optimistic
             case RPCServer.optimisticKovan.chainID: return .optimisticKovan
+                    //hhh3 here
             default: return .main
             }
         }()

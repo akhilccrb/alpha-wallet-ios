@@ -13,8 +13,7 @@ enum DappAction {
     case sendTransaction(UnconfirmedTransaction)
     case sendRawTransaction(String)
     case ethCall(from: String, to: String, data: String)
-    //hhh1 add associated values
-    case walletAddEthereumChain
+    case walletAddEthereumChain(WalletAddEthereumChainObject)
     case unknown
 }
 
@@ -51,12 +50,8 @@ extension DappAction {
             case .unknown:
                 return .unknown
             }
-        case .walletAddEthereumChain:
-            //hhh2 store values
-            //let from = command.object["from"]?.value ?? ""
-            //let to = command.object["to"]?.value ?? ""
-            //let data = command.object["data"]?.value ?? ""
-            return .walletAddEthereumChain
+        case .walletAddEthereumChain(let command):
+            return .walletAddEthereumChain(command.object)
         }
     }
 

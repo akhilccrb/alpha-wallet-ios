@@ -446,11 +446,21 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
             let from = AlphaWallet.Address(uncheckedAgainstNullAddress: from)
             let to = AlphaWallet.Address(uncheckedAgainstNullAddress: to)
             ethCall(callbackID: callbackID, from: from, to: to, data: data, server: server)
-        case .walletAddEthereumChain:
+        case .walletAddEthereumChain(let customChain):
             //hhh3 handle walletAddEthereumChain. Show UI etc
             NSLog("xxx handle walletAddEthereumChain, show UI etc")
+            //hhh3 figure out etherscanCompatibleType
+            //hhh3 ask about isTestNet too
+            //hhh3 what about chain name?
+            //hhh3 if we use drop0x, we should check if it's there first? If it's not, assume base-10
+            //hhh forced unwrap
+            //hhh3 what if no RPC provided in the dapp's walletAddEthereumChain call?
+            let chainId: Int = Int(customChain.chainId.drop0x, radix: 16)!
+            let customRPC = CustomRPC(chainID: chainId, nativeCryptoTokenName: customChain.nativeCurrency?.name, chainName: customChain.chainName ?? "Unknown", symbol: customChain.nativeCurrency?.symbol, rpcEndpoint: customChain.rpcUrls!.first!, explorerEndpoint: customChain.blockExplorerUrls?.first, etherscanCompatibleType: .blockscout, isTestNet: false)
+            RPCServer.servers.append(RPCServer.custom(customRPC))
+            NSLog("xxx servers now: \(RPCServer.servers)")
 
-            //hhh remove
+            //hhh replace with actual
             let callback = DappCallback(id: callbackID, value: .walletAddEthereumChain)
             //hhh2 handle error? If error, it's .failture
             browserViewController.notifyFinish(callbackID: callbackID, value: .success(callback))

@@ -9,32 +9,40 @@ protocol ServersCoordinatorDelegate: class {
 }
 
 class ServersCoordinator: Coordinator {
-    static let serversOrdered: [RPCServer] = [
-        .main,
-        .xDai,
-        .classic,
-        .poa,
-        .ropsten,
-        .goerli,
-        .kovan,
-        .rinkeby,
-        .sokol,
-        .binance_smart_chain,
-        .binance_smart_chain_testnet,
-        .callisto,
-        .heco,
-        .heco_testnet,
-        .artis_sigma1,
-        .artis_tau1,
-        .fantom,
-        .fantom_testnet,
-        .avalanche,
-        .avalanche_testnet,
-        .polygon,
-        .mumbai_testnet,
-        .optimistic,
-        .optimisticKovan,
-    ]
+    //hhh3 probably can't be a let since it's dynamic now? Even if it's saved, it can change during runtime without killing app
+    //static let serversOrdered: [RPCServer] = [
+    static var serversOrdered: [RPCServer] {
+        //hhh3 enable them again
+        [
+            .main,
+            //.xDai,
+            //.classic,
+            //.poa,
+            //.ropsten,
+            //.goerli,
+            //.kovan,
+            //.rinkeby,
+            //.sokol,
+            //.binance_smart_chain,
+            //.binance_smart_chain_testnet,
+            //.callisto,
+            //hhh restore
+            //.heco,
+            //.heco_testnet,
+            //.artis_sigma1,
+            //.artis_tau1,
+            //.fantom,
+            //.fantom_testnet,
+            //.avalanche,
+            //.avalanche_testnet,
+            //.polygon,
+            //.mumbai_testnet,
+            //.optimistic,
+            //.optimisticKovan,
+            //hhh which
+            //]
+        ] + RPCServer.servers
+    }
 
     private let viewModel: ServersViewModel
     private lazy var serversViewController: ServersViewController = {

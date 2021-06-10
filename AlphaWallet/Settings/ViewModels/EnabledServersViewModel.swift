@@ -50,7 +50,10 @@ struct EnabledServersViewModel {
     }
 
     func isServerSelected(_ server: RPCServer) -> Bool {
-        selectedServers.contains(server)
+        //hhh restore
+        //selectedServers.contains(server)
+        NSLog("xxx selected servers: \(selectedServers) check agains: \(server) selected? \(selectedServers.contains(server))")
+        return selectedServers.contains(server)
     }
 
     func serverCount(forMode mode: Mode) -> Int {

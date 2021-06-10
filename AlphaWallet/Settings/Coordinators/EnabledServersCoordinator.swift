@@ -8,7 +8,11 @@ protocol EnabledServersCoordinatorDelegate: class {
 }
 
 class EnabledServersCoordinator: Coordinator {
-    static let serversOrdered: [RPCServer] = ServersCoordinator.serversOrdered
+    //hhh3 probably can't be a let since it's dynamic now? Even if it's saved, it can change during runtime without killing app
+    //static let serversOrdered: [RPCServer] = ServersCoordinator.serversOrdered
+    static var serversOrdered: [RPCServer] {
+        ServersCoordinator.serversOrdered
+    }
 
     private let serverChoices = EnabledServersCoordinator.serversOrdered
     private let navigationController: UINavigationController
