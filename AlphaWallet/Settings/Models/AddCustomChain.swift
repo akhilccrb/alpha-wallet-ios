@@ -54,6 +54,7 @@ class AddCustomChain {
             }
 
             let customRpc = CustomRPC(chainID: chainId, nativeCryptoTokenName: customChain.nativeCurrency?.name, chainName: customChain.chainName ?? "Unknown", symbol: customChain.nativeCurrency?.symbol, rpcEndpoint: rpcUrl, explorerEndpoint: customChain.blockExplorerUrls?.first, etherscanCompatibleType: .blockscout, isTestNet: false)
+            //hhh3 does this crash? It shouldn't. Maybe it was crashing because it has already been marked as enabled previously in running app
             RPCServer.servers.append(RPCServer.custom(customRpc))
             NSLog("xxx servers now: \(RPCServer.servers)")
         }
@@ -108,13 +109,13 @@ extension Int {
     //We'll take both "0x12" and "18" as `18`. The former is as spec like https://eips.ethereum.org/EIPS/eip-695, the latter to be more forgiving of dapps
     init?(chainId0xString string: String) {
         if string.has0xPrefix {
-            if let i = Int(string) {
+            if let i = Int(string.drop0x, radix: 16) {
                 self = i
             } else {
                 return nil
             }
         } else {
-            if let i = Int(string.drop0x, radix: 16) {
+            if let i = Int(string) {
                 self = i
             } else {
                 return nil

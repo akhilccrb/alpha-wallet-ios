@@ -450,29 +450,65 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
             ethCall(callbackID: callbackID, from: from, to: to, data: data, server: server)
         case .walletAddEthereumChain(let customChain):
             //hhh3 enable the chain for the user automatically will force restart of the UI... (then we switch to it, or not, for the browser?)
-            let customChainId = Int(chainId0xString: customChain.chainId)
-            if ServersCoordinator.serversOrdered.contains(where: { $0.chainID == customChainId }) {
-                guard let addCustomChain = addCustomChain else { return }
-                //hhh3 must not restart UI if already active though. But if it is already present, but not active, must prompt user to switch
-                notifyAddCustomChainSucceeded(in: addCustomChain.chain)
+            guard let customChainId = Int(chainId0xString: customChain.chainId) else {
+                NSLog("xxx invalid chainId: \(customChain.chainId)")
+                let error = DAppError.nodeError("Invalid chainId provided: \(customChain.chainId)")
+                browserViewController.notifyFinish(callbackID: callbackID, value: .failure(error))
                 return
             }
+            if let existingServer = ServersCoordinator.serversOrdered.first(where: { $0.chainID == customChainId }) {
+                NSLog("xxx here 1")
+                //hhh3 must not restart UI if already active though. But if it is already present, but not active, must prompt user to switch
+                if config.enabledServers.contains(where: { $0.chainID == customChainId }) {
+                    NSLog("xxx already have this chain enabled: \(customChainId)")
+                    notifyAddCustomChainSucceeded(in: .init(customChain))
+                    if server.chainID == customChainId {
+                        NSLog("xxx already have this chain active for browser: \(customChainId). So do nothing else")
+                    } else {
+                        //hhh4 change instruction to do it automatically for users
+                        NSLog("xxx NOT have this chain active for browser: \(customChainId)")
+                        //hhh4 check if already activate in browser, if not ask user to do it
+                        let title = "In order to use this dapp, you should go to tap ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
+                        UIAlertController.alert(title: title,
+                                message: nil,
+                                alertButtonTitles: [R.string.localizable.oK()],
+                                alertButtonStyles: [.default],
+                                viewController: viewController,
+                                completion: nil)
+                    }
+                } else {
+                    NSLog("xxx already have this chain but NOT enabled: \(customChainId)")
+                    //hhh4 so need to tell user to enable it as well as switch browser (and don't auto switch)
+                    notifyAddCustomChainSucceeded(in: .init(customChain))
+                    //hhh4 change instruction to do it automatically for users
+                    let title = "In order to use this dapp, you should go to Settings tab > Select Active Networks and enable \(existingServer.displayName) and then Browser tab > ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
+                    UIAlertController.alert(title: title,
+                            message: nil,
+                            alertButtonTitles: [R.string.localizable.oK()],
+                            alertButtonStyles: [.default],
+                            viewController: viewController,
+                            completion: nil)
+                }
+                return
+            } else {
+                NSLog("xxx here 2")
 
-            UIAlertController.alert(title: "Add the custom chain with ID: \(customChain.chainId)? The app session will restart with the chain enabled.",
-                    message: nil,
-                    alertButtonTitles: [R.string.localizable.addButtonTitle(), R.string.localizable.cancel()],
-                    alertButtonStyles: [.destructive, .cancel],
-                    viewController: viewController,
-                    completion: { [self] choice in
-                        NSLog("xxx choice: \(choice)")
-                        guard choice == 0 else { return }
-                        NSLog("xxx adding chain")
-                        //hhh3 does this get destroyed before completion?
-                        let addCustomChain = AddCustomChain(customChain)
-                        addCustomChain.delegate = self
-                        addCustomChain.run()
-                        self.addCustomChain = (chain: addCustomChain, callbackId: callbackID)
-                    })
+                UIAlertController.alert(title: "Add the custom chain with ID: \(customChain.chainId)? The app session will restart with the chain enabled.",
+                        message: nil,
+                        alertButtonTitles: [R.string.localizable.addButtonTitle(), R.string.localizable.cancel()],
+                        alertButtonStyles: [.destructive, .cancel],
+                        viewController: viewController,
+                        completion: { [self] choice in
+                            NSLog("xxx choice: \(choice)")
+                            guard choice == 0 else { return }
+                            NSLog("xxx adding chain")
+                            //hhh3 does this get destroyed before completion?
+                            let addCustomChain = AddCustomChain(customChain)
+                            addCustomChain.delegate = self
+                            addCustomChain.run()
+                            self.addCustomChain = (chain: addCustomChain, callbackId: callbackID)
+                        })
+            }
         case .unknown, .sendRawTransaction:
             break
         }
@@ -848,7 +884,6 @@ extension DappBrowserCoordinator: AddCustomChainDelegate {
             NSLog("xxx delegate fired, but no addCustomChain object")
             return
         }
-        let callback = DappCallback(id: addCustomChain.callbackId, value: .walletAddEthereumChain)
         browserViewController.notifyFinish(callbackID: addCustomChain.callbackId, value: .failure(error))
         self.addCustomChain = nil
     }
