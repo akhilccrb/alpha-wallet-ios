@@ -465,9 +465,8 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                     if server.chainID == customChainId {
                         NSLog("xxx already have this chain active for browser: \(customChainId). So do nothing else")
                     } else {
-                        //hhh4 change instruction to do it automatically for users
+                        //hhh4 replace instruction to do it automatically for users
                         NSLog("xxx NOT have this chain active for browser: \(customChainId)")
-                        //hhh4 check if already activate in browser, if not ask user to do it
                         let title = "In order to use this dapp, you should go to tap ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
                         UIAlertController.alert(title: title,
                                 message: nil,
@@ -478,9 +477,8 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                     }
                 } else {
                     NSLog("xxx already have this chain but NOT enabled: \(customChainId)")
-                    //hhh4 so need to tell user to enable it as well as switch browser (and don't auto switch)
                     notifyAddCustomChainSucceeded(in: .init(customChain))
-                    //hhh4 change instruction to do it automatically for users
+                    //hhh4 replace instruction to do it automatically for users
                     let title = "In order to use this dapp, you should go to Settings tab > Select Active Networks and enable \(existingServer.displayName) and then Browser tab > ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
                     UIAlertController.alert(title: title,
                             message: nil,
