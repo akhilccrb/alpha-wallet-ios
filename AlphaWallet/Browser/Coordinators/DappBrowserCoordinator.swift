@@ -468,13 +468,23 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                         //hhh4 replace instruction to do it automatically for users
                         //hhh4 change the success/failure call based on user choice
                         NSLog("xxx NOT have this chain active for browser: \(customChainId)")
-                        //let title = "In order to use this dapp, you should go to tap ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
-                        //UIAlertController.alert(title: title,
-                        //        message: nil,
-                        //        alertButtonTitles: [R.string.localizable.oK()],
-                        //        alertButtonStyles: [.default],
-                        //        viewController: viewController,
-                        //        completion: nil)
+                        let title = "In order to use this dapp, you should enable \(existingServer.displayName) and then Browser tab > ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
+                        UIAlertController.alert(title: title,
+                                message: nil,
+                                alertButtonTitles: [R.string.localizable.oK(), R.string.localizable.cancel()],
+                                alertButtonStyles: [.default, .cancel],
+                                viewController: viewController,
+                                completion: { [self] choice in
+                                    NSLog("xxx choice: \(choice)")
+                                    if choice == 0 {
+                                        //hhh5 implement
+                                        NSLog("xxx so need to switch browser")
+                                    } else {
+                                        NSLog("xxx cancelled")
+                                        self.addCustomChain = (chain: AddCustomChain(customChain), callbackId: callbackID)
+                                        notifyAddCustomChainFailed(error: DAppError.cancelled, in: .init(customChain))
+                                    }
+                                })
                     }
                 } else {
                     NSLog("xxx already have this chain but NOT enabled: \(customChainId)")
@@ -482,25 +492,28 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                     //hhh4 replace instruction to do it automatically for users
                     //hhh4 change the success/failure call based on user choice
                     let title = "In order to use this dapp, you should go to Settings tab > Select Active Networks and enable \(existingServer.displayName) and then Browser tab > ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
-                    hhh4 install app, import 0x007 and test
                     UIAlertController.alert(title: title,
                             message: nil,
                             alertButtonTitles: [R.string.localizable.oK(), R.string.localizable.cancel()],
-                            alertButtonStyles: [.default],
+                            alertButtonStyles: [.default, .cancel],
                             viewController: viewController,
                             completion: { [self] choice in
                                 NSLog("xxx choice: \(choice)")
                                 if choice == 0 {
+                                    //hhh5 implement
                                     NSLog("xxx so need to enable network and switch browser")
+                                    `switch`(toServer: RPCServer.custom(.init(customChain: customChain)))
                                 } else {
                                     NSLog("xxx cancelled")
-                                    //hhh4 fire error that user cancelled
+                                    self.addCustomChain = (chain: AddCustomChain(customChain), callbackId: callbackID)
+                                    notifyAddCustomChainFailed(error: DAppError.cancelled, in: .init(customChain))
                                 }
                             })
                 }
                 return
             } else {
                 NSLog("xxx here 2")
+                //hhh6 have to do this first, otherwise crashes are too troublesome
 
                 //hhh4 also need to enable chain and switch in browser like above
                 UIAlertController.alert(title: "Add the custom chain with ID: \(customChain.chainId)? The app session will restart with the chain enabled.",
@@ -516,6 +529,7 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                             let addCustomChain = AddCustomChain(customChain)
                             addCustomChain.delegate = self
                             addCustomChain.run()
+                            //hhh still need this because `run()` might fail
                             self.addCustomChain = (chain: addCustomChain, callbackId: callbackID)
                         })
             }
@@ -877,6 +891,7 @@ extension DappBrowserCoordinator {
 }
 
 extension DappBrowserCoordinator: AddCustomChainDelegate {
+    //hhh4 local calls to this should be refactored
     func notifyAddCustomChainSucceeded(in addCustomChain: AddCustomChain) {
         guard let addCustomChain = self.addCustomChain else {
             NSLog("xxx delegate fired, but no addCustomChain object")
@@ -889,6 +904,7 @@ extension DappBrowserCoordinator: AddCustomChainDelegate {
         //hhh3 if not already enabled, enable the chain and restart. Delegate should switch browser to the chain too, but will it crash? Probably not because only browser Unless we still get balance?
     }
 
+    //hhh4 local calls to this should be refactored
     func notifyAddCustomChainFailed(error: DAppError, in addCustomChain: AddCustomChain) {
         guard let addCustomChain = self.addCustomChain else {
             NSLog("xxx delegate fired, but no addCustomChain object")

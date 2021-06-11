@@ -31,7 +31,7 @@ class AddCustomChain {
                 self.informDappCustomChainAddingFailed(error)
             } else {
                 NSLog("xxx error. Maybe when checking custom chain? So can't check. Not DAppError, make up something")
-                self.informDappCustomChainAddingFailed(.nodeError("Uknown Error"))
+                self.informDappCustomChainAddingFailed(.nodeError("Unknown Error"))
             }
         }
     }
@@ -53,8 +53,10 @@ class AddCustomChain {
                 throw DAppError.nodeError("No RPC node URL provided")
             }
 
+            //hhh4 use the new init?
             let customRpc = CustomRPC(chainID: chainId, nativeCryptoTokenName: customChain.nativeCurrency?.name, chainName: customChain.chainName ?? "Unknown", symbol: customChain.nativeCurrency?.symbol, rpcEndpoint: rpcUrl, explorerEndpoint: customChain.blockExplorerUrls?.first, etherscanCompatibleType: .blockscout, isTestNet: false)
             //hhh3 does this crash? It shouldn't. Maybe it was crashing because it has already been marked as enabled previously in running app
+            //hhh6 instead of doing here, need to queue this and restart app
             RPCServer.servers.append(RPCServer.custom(customRpc))
             NSLog("xxx servers now: \(RPCServer.servers)")
         }
@@ -82,6 +84,7 @@ class AddCustomChain {
                 throw DAppError.nodeError("No RPC node URL provided")
             }
 
+            //hhh4 use the new init?
             let customRpc = CustomRPC(chainID: chainId, nativeCryptoTokenName: customChain.nativeCurrency?.name, chainName: customChain.chainName ?? "Unknown", symbol: customChain.nativeCurrency?.symbol, rpcEndpoint: rpcUrl, explorerEndpoint: customChain.blockExplorerUrls?.first, etherscanCompatibleType: .blockscout, isTestNet: false)
             let server = RPCServer.custom(customRpc)
             let request = EthChainIdRequest()
