@@ -6,7 +6,7 @@ import JSONRPCKit
 import PromiseKit
 
 protocol AddCustomChainDelegate: class {
-    func notifyAddCustomChainSucceeded(in addCustomChain: AddCustomChain)
+    func notifyAddCustomChainQueuedSuccessfully(in addCustomChain: AddCustomChain)
     func notifyAddCustomChainFailed(error: DAppError, in addCustomChain: AddCustomChain)
 }
 
@@ -24,7 +24,7 @@ class AddCustomChain {
         }.then {
             self.addCustomChain(self.customChain)
         }.done {
-            self.informDappCustomChainAddedSuccessfully()
+            self.notifyAddCustomChainQueuedSuccessfully()
         }.catch {
             if let error = $0 as? DAppError {
                 NSLog("xxx error. Maybe when checking custom chain? So can't check. DAppError: \(error)")
@@ -36,6 +36,7 @@ class AddCustomChain {
         }
     }
 
+    //hhh6 rename to queue
     private func addCustomChain(_ customChain: WalletAddEthereumChainObject) -> Promise<Void> {
         Promise { seal in
             NSLog("xxx handle walletAddEthereumChain, show UI etc")
@@ -62,8 +63,9 @@ class AddCustomChain {
         }
     }
 
-    private func informDappCustomChainAddedSuccessfully() {
-        delegate?.notifyAddCustomChainSucceeded(in: self)
+    //hhh5 might rename since we don't inform dapp if we really added
+    private func notifyAddCustomChainQueuedSuccessfully() {
+        delegate?.notifyAddCustomChainQueuedSuccessfully(in: self)
     }
 
     private func informDappCustomChainAddingFailed(_ error: DAppError) {

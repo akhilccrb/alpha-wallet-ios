@@ -358,6 +358,19 @@ final class DappBrowserCoordinator: NSObject, Coordinator {
             open(url: url, animated: false)
         }
     }
+
+    //hhh4 why is this needed? Is it needed?
+    func notifyAddCustomChainSucceeded() {
+        guard let addCustomChain = self.addCustomChain else {
+            NSLog("xxx delegate fired, but no addCustomChain object")
+            return
+        }
+        //hhh3 must test if chain is already added/supported, what happens? We shouldn't trigger a restart
+        let callback = DappCallback(id: addCustomChain.callbackId, value: .walletAddEthereumChain)
+        browserViewController.notifyFinish(callbackID: addCustomChain.callbackId, value: .success(callback))
+        self.addCustomChain = nil
+        //hhh3 if not already enabled, enable the chain and restart. Delegate should switch browser to the chain too, but will it crash? Probably not because only browser Unless we still get balance?
+    }
 }
 
 extension DappBrowserCoordinator: TransactionConfirmationCoordinatorDelegate {
@@ -461,7 +474,7 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                 //hhh3 must not restart UI if already active though. But if it is already present, but not active, must prompt user to switch
                 if config.enabledServers.contains(where: { $0.chainID == customChainId }) {
                     NSLog("xxx already have this chain enabled: \(customChainId)")
-                    notifyAddCustomChainSucceeded(in: .init(customChain))
+                    notifyAddCustomChainSucceeded()
                     if server.chainID == customChainId {
                         NSLog("xxx already have this chain active for browser: \(customChainId). So do nothing else")
                     } else {
@@ -488,7 +501,7 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                     }
                 } else {
                     NSLog("xxx already have this chain but NOT enabled: \(customChainId)")
-                    notifyAddCustomChainSucceeded(in: .init(customChain))
+                    notifyAddCustomChainSucceeded()
                     //hhh4 replace instruction to do it automatically for users
                     //hhh4 change the success/failure call based on user choice
                     let title = "In order to use this dapp, you should go to Settings tab > Select Active Networks and enable \(existingServer.displayName) and then Browser tab > ... button > \(R.string.localizable.dappBrowserSwitchServer(server.name)) and choose \(existingServer.displayName)"
@@ -891,20 +904,15 @@ extension DappBrowserCoordinator {
 }
 
 extension DappBrowserCoordinator: AddCustomChainDelegate {
-    //hhh4 local calls to this should be refactored
-    func notifyAddCustomChainSucceeded(in addCustomChain: AddCustomChain) {
+    func notifyAddCustomChainQueuedSuccessfully(in addCustomChain: AddCustomChain) {
         guard let addCustomChain = self.addCustomChain else {
             NSLog("xxx delegate fired, but no addCustomChain object")
             return
         }
-        //hhh3 must test if chain is already added/supported, what happens? We shouldn't trigger a restart
-        let callback = DappCallback(id: addCustomChain.callbackId, value: .walletAddEthereumChain)
-        browserViewController.notifyFinish(callbackID: addCustomChain.callbackId, value: .success(callback))
-        self.addCustomChain = nil
-        //hhh3 if not already enabled, enable the chain and restart. Delegate should switch browser to the chain too, but will it crash? Probably not because only browser Unless we still get balance?
+        //hhh6 just restart
     }
 
-    //hhh4 local calls to this should be refactored
+    //hhh4 local calls, if any, to this should be refactored
     func notifyAddCustomChainFailed(error: DAppError, in addCustomChain: AddCustomChain) {
         guard let addCustomChain = self.addCustomChain else {
             NSLog("xxx delegate fired, but no addCustomChain object")
