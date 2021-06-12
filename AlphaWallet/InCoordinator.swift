@@ -69,6 +69,7 @@ class InCoordinator: NSObject, Coordinator {
     lazy var nativeCryptoCurrencyPrices: ServerDictionary<Subscribable<Double>> = {
         return createEtherPricesSubscribablesForAllChains()
     }()
+    private let restartQueue = RestartQueue()
     lazy var nativeCryptoCurrencyBalances: ServerDictionary<Subscribable<BigInt>> = {
         return createEtherBalancesSubscribablesForAllChains()
     }()
@@ -502,7 +503,7 @@ class InCoordinator: NSObject, Coordinator {
     }
 
     private func createBrowserCoordinator(sessions: ServerDictionary<WalletSession>, browserOnly: Bool, analyticsCoordinator: AnalyticsCoordinator) -> DappBrowserCoordinator {
-        let coordinator = DappBrowserCoordinator(sessions: sessions, keystore: keystore, config: config, sharedRealm: realm, browserOnly: browserOnly, nativeCryptoCurrencyPrices: nativeCryptoCurrencyPrices, analyticsCoordinator: analyticsCoordinator)
+        let coordinator = DappBrowserCoordinator(sessions: sessions, keystore: keystore, config: config, sharedRealm: realm, browserOnly: browserOnly, nativeCryptoCurrencyPrices: nativeCryptoCurrencyPrices, restartQueue: restartQueue, analyticsCoordinator: analyticsCoordinator)
         coordinator.delegate = self
         coordinator.start()
         coordinator.rootViewController.tabBarItem = UITabBarItem(title: R.string.localizable.browserTabbarItemTitle(), image: R.image.tab_browser(), selectedImage: nil)
@@ -966,6 +967,24 @@ extension InCoordinator: DappBrowserCoordinatorDelegate {
     func handleCustomUrlScheme(_ url: URL, forCoordinator coordinator: DappBrowserCoordinator) {
         delegate?.handleCustomUrlScheme(url, forCoordinator: self)
     }
+
+    hhh7 test this! Will it crash because servers are looked up right before restart?
+    func restartToAddServer(inCoordinator coordinator: DappBrowserCoordinator) {
+        for each in restartQueue.queue {
+            switch each {
+            case .enableServer(let server):
+                //hhh6 improve? Serialize, etc
+                RPCServer.servers.append(server)
+            }
+        }
+        restartQueue.clear()
+
+        //hhh6 almost dup of `func didRestart(with account: Wallet, in coordinator: SettingsCoordinator, reason: RestartReason) {`
+        OpenSea.resetInstances()
+        disconnectWalletConnectSessionsSelectively(for: .serverChange)
+
+        delegate?.didRestart(in: self, wallet: wallet)
+    }
 }
 
 extension InCoordinator: StaticHTMLViewControllerDelegate {
@@ -1098,3 +1117,23 @@ extension InCoordinator: TokensDataStorePriceDelegate {
     }
 }
 // swiftlint:enable file_length
+//hhh6 move
+class RestartQueue {
+    private (set) var queue: [RestartTask]
+
+    enum RestartTask {
+        case enableServer(RPCServer)
+    }
+
+    init() {
+        queue = .init()
+    }
+
+    func add(_ task: RestartTask) {
+        queue.append(task)
+    }
+
+    func clear() {
+        queue.removeAll()
+    }
+}

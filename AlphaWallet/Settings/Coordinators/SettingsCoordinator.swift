@@ -245,6 +245,7 @@ extension SettingsCoordinator: EnabledServersCoordinatorDelegate {
 			coordinator.stop()
 			removeCoordinator(coordinator)
 		} else {
+            //hhh6 maybe use restart queue here too
 			config.enabledServers = servers
             restart(for: account, reason: .serverChange)
 		}

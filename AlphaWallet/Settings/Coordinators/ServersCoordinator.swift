@@ -15,7 +15,7 @@ class ServersCoordinator: Coordinator {
         //hhh1 enable them again
         [
             .main,
-            //.xDai,
+            .xDai,
             //.classic,
             //.poa,
             //.ropsten,

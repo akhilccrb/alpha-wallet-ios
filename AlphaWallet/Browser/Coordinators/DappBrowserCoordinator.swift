@@ -14,6 +14,7 @@ protocol DappBrowserCoordinatorDelegate: class, CanOpenURL {
     func importUniversalLink(url: URL, forCoordinator coordinator: DappBrowserCoordinator)
     func handleUniversalLink(_ url: URL, forCoordinator coordinator: DappBrowserCoordinator)
     func handleCustomUrlScheme(_ url: URL, forCoordinator coordinator: DappBrowserCoordinator)
+    func restartToAddServer(inCoordinator coordinator: DappBrowserCoordinator)
 }
 
 final class DappBrowserCoordinator: NSObject, Coordinator {
@@ -47,6 +48,7 @@ final class DappBrowserCoordinator: NSObject, Coordinator {
     private let sharedRealm: Realm
     private let browserOnly: Bool
     private let nativeCryptoCurrencyPrices: ServerDictionary<Subscribable<Double>>
+    private let restartQueue: RestartQueue
 
     private lazy var bookmarksStore: BookmarksStore = {
         return BookmarksStore(realm: sharedRealm)
@@ -113,6 +115,7 @@ final class DappBrowserCoordinator: NSObject, Coordinator {
         sharedRealm: Realm,
         browserOnly: Bool,
         nativeCryptoCurrencyPrices: ServerDictionary<Subscribable<Double>>,
+        restartQueue: RestartQueue,
         analyticsCoordinator: AnalyticsCoordinator
     ) {
         self.navigationController = UINavigationController(navigationBarClass: DappBrowserNavigationBar.self, toolbarClass: nil)
@@ -122,6 +125,7 @@ final class DappBrowserCoordinator: NSObject, Coordinator {
         self.sharedRealm = sharedRealm
         self.browserOnly = browserOnly
         self.nativeCryptoCurrencyPrices = nativeCryptoCurrencyPrices
+        self.restartQueue = restartQueue
         self.analyticsCoordinator = analyticsCoordinator
 
         super.init()
@@ -494,8 +498,8 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                                         NSLog("xxx so need to switch browser")
                                     } else {
                                         NSLog("xxx cancelled")
-                                        self.addCustomChain = (chain: AddCustomChain(customChain), callbackId: callbackID)
-                                        notifyAddCustomChainFailed(error: DAppError.cancelled, in: .init(customChain))
+                                        self.addCustomChain = (chain: AddCustomChain(customChain, restartQueue: restartQueue), callbackId: callbackID)
+                                        notifyAddCustomChainFailed(error: DAppError.cancelled, in: .init(customChain, restartQueue: restartQueue))
                                     }
                                 })
                     }
@@ -518,8 +522,8 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                                     `switch`(toServer: RPCServer.custom(.init(customChain: customChain)))
                                 } else {
                                     NSLog("xxx cancelled")
-                                    self.addCustomChain = (chain: AddCustomChain(customChain), callbackId: callbackID)
-                                    notifyAddCustomChainFailed(error: DAppError.cancelled, in: .init(customChain))
+                                    self.addCustomChain = (chain: AddCustomChain(customChain, restartQueue: restartQueue), callbackId: callbackID)
+                                    notifyAddCustomChainFailed(error: DAppError.cancelled, in: .init(customChain, restartQueue: restartQueue))
                                 }
                             })
                 }
@@ -539,7 +543,7 @@ extension DappBrowserCoordinator: BrowserViewControllerDelegate {
                             guard choice == 0 else { return }
                             NSLog("xxx adding chain")
                             //hhh3 does this get destroyed before completion?
-                            let addCustomChain = AddCustomChain(customChain)
+                            let addCustomChain = AddCustomChain(customChain, restartQueue: restartQueue)
                             addCustomChain.delegate = self
                             addCustomChain.run()
                             //hhh still need this because `run()` might fail
@@ -909,7 +913,7 @@ extension DappBrowserCoordinator: AddCustomChainDelegate {
             NSLog("xxx delegate fired, but no addCustomChain object")
             return
         }
-        //hhh6 just restart
+        delegate?.restartToAddServer(inCoordinator: self)
     }
 
     //hhh4 local calls, if any, to this should be refactored

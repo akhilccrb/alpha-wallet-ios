@@ -12,10 +12,13 @@ protocol AddCustomChainDelegate: class {
 
 class AddCustomChain {
     private let customChain: WalletAddEthereumChainObject
+    private let restartQueue: RestartQueue
+
     weak var delegate: AddCustomChainDelegate?
 
-    init(_ customChain: WalletAddEthereumChainObject) {
+    init(_ customChain: WalletAddEthereumChainObject, restartQueue: RestartQueue) {
         self.customChain = customChain
+        self.restartQueue = restartQueue
     }
 
     func run() {
@@ -56,9 +59,7 @@ class AddCustomChain {
 
             //hhh4 use the new init?
             let customRpc = CustomRPC(chainID: chainId, nativeCryptoTokenName: customChain.nativeCurrency?.name, chainName: customChain.chainName ?? "Unknown", symbol: customChain.nativeCurrency?.symbol, rpcEndpoint: rpcUrl, explorerEndpoint: customChain.blockExplorerUrls?.first, etherscanCompatibleType: .blockscout, isTestNet: false)
-            //hhh3 does this crash? It shouldn't. Maybe it was crashing because it has already been marked as enabled previously in running app
-            //hhh6 instead of doing here, need to queue this and restart app
-            RPCServer.servers.append(RPCServer.custom(customRpc))
+            restartQueue.add(.enableServer(RPCServer.custom(customRpc)))
             NSLog("xxx servers now: \(RPCServer.servers)")
         }
     }
