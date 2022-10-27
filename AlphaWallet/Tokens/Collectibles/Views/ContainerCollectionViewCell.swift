@@ -8,10 +8,10 @@
 import UIKit
 
 struct ContainerCollectionViewCellViewModel {
-    var backgroundColor: UIColor = GroupedTable.Color.background
+    var backgroundColor: UIColor = Configuration.Color.Semantic.collectionViewCellBackground
 }
 
-typealias TokenCardConfigurableView = UIView & TokenCardRowViewLayoutConfigurableProtocol
+typealias TokenCardConfigurableView = UIView & TokenCardRowViewLayoutConfigurable
 class ContainerCollectionViewCell: UICollectionViewCell {
     private let background = UIView()
     private let cellSeparators = (top: UIView(), bottom: UIView())
@@ -39,10 +39,10 @@ class ContainerCollectionViewCell: UICollectionViewCell {
         }
     }
 
-    static func configureSeparatorLines(selection: GridOrListSelectionState, _ element: ContainerCollectionViewCell) {
-        switch selection {
+    static func configureSeparatorLines(layout: GridOrListLayout, _ element: ContainerCollectionViewCell) {
+        switch layout {
         case .list:
-            element.cellSeparators.bottom.backgroundColor = R.color.mercury()
+            element.cellSeparators.bottom.backgroundColor = Configuration.Color.Semantic.tableViewSeparator
         case .grid:
             element.cellSeparators.bottom.backgroundColor = .clear
         }
@@ -50,11 +50,11 @@ class ContainerCollectionViewCell: UICollectionViewCell {
 
     @objc private func invalidateInnerLayout(_ notification: NSNotification) {
         guard
-            let selection = notification.userInfo?["selection"] as? GridOrListSelectionState,
+            let layout = notification.userInfo?["layout"] as? GridOrListLayout,
             let sender = notification.object as? UICollectionView, sender == collectionView else { return }
 
-        ContainerCollectionViewCell.configureSeparatorLines(selection: selection, self)
-        subview?.configureLayout(layout: selection)
+        ContainerCollectionViewCell.configureSeparatorLines(layout: layout, self)
+        subview?.configureLayout(layout: layout)
 
         layoutSubviews()
     }

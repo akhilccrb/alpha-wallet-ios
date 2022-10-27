@@ -88,10 +88,10 @@ fileprivate var smartContractCallsCache = AtomicDictionary<String, (promise: Pro
 private let callSmartContractQueue = DispatchQueue(label: "com.callSmartContractQueue.updateQueue")
 //`shouldDelayIfCached` is a hack for TokenScript views
 //TODO should trap 429 from RPC node
-public func callSmartContract(withServer server: RPCServer, contract: AlphaWallet.Address, functionName: String, abiString: String, parameters: [AnyObject] = [], shouldDelayIfCached: Bool = false, queue: DispatchQueue? = nil) -> Promise<[String: Any]> {
+public func callSmartContract(withServer server: RPCServer, contract contractAddress: AlphaWallet.Address, functionName: String, abiString: String, parameters: [AnyObject] = [], shouldDelayIfCached: Bool = false, queue: DispatchQueue? = nil) -> Promise<[String: Any]> {
     let timeout: TimeInterval = 60
     //We must include the ABI string in the key because the order of elements in a dictionary when serialized in the string is not ordered. Parameters (which is ordered) should ensure it's the same function
-    let cacheKey = "\(contract).\(functionName) \(parameters) \(server.chainID)"
+    let cacheKey = "\(contractAddress).\(functionName) \(parameters) \(server.chainID)"
     let ttlForCache: TimeInterval = 10
     let now = Date()
     if let (cachedPromise, cacheTimestamp) = smartContractCallsCache[cacheKey] {
@@ -118,14 +118,14 @@ public func callSmartContract(withServer server: RPCServer, contract: AlphaWalle
                 return
             }
 
-            let contractAddress = EthereumAddress(address: contract)
+            let contractAddress = EthereumAddress(address: contractAddress)
 
-            guard let contractInstance = Web3.Contract(web3: web3, abiString: abiString, at: contractAddress, options: nil) else {
+            guard let contract = Web3.Contract(web3: web3, abiString: abiString, at: contractAddress, options: nil) else {
                 seal.reject(Web3Error(description: "Error creating web3swift contract instance to call \(functionName)()"))
                 return
             }
-            guard let promiseCreator = contractInstance.method(functionName, parameters: parameters, options: nil) else {
-                seal.reject(Web3Error(description: "Error calling \(contract.eip55String).\(functionName)() with parameters: \(parameters)"))
+            guard let promiseCreator = contract.method(functionName, parameters: parameters, options: nil) else {
+                seal.reject(Web3Error(description: "Error calling \(contractAddress.address).\(functionName)() with parameters: \(parameters)"))
                 return
             }
             var web3Options = Web3Options()
@@ -152,8 +152,9 @@ public func callSmartContract(withServer server: RPCServer, contract: AlphaWalle
             })
         }
     }
-
+    
     smartContractCallsCache[cacheKey] = (result, now)
+
     return result
 }
 
@@ -167,20 +168,40 @@ public func getSmartContractCallData(withServer server: RPCServer, contract cont
     return promiseCreator.transaction.data
 }
 
-public func getEventLogs(withServer server: RPCServer, contract contractAddress: AlphaWallet.Address, eventName: String, abiString: String, filter: EventFilter) -> Promise<[EventParserResultProtocol]> {
-    let contractAddress = EthereumAddress(address: contractAddress)
+final class GetEventLogs {
+    private let queue = DispatchQueue(label: "org.alphawallet.swift.eth.getEventLogs", qos: .utility)
+    private var inFlightPromises: [String: Promise<[EventParserResultProtocol]>] = [:]
 
-    guard let web3 = try? Web3.instance(for: server, timeout: 60) else {
-        return Promise(error: Web3Error(description: "Error creating web3 for: \(server.rpcURL) + \(server.chainID)"))
+    func getEventLogs(contractAddress: AlphaWallet.Address, server: RPCServer, eventName: String, abiString: String, filter: EventFilter) -> Promise<[EventParserResultProtocol]> {
+        firstly {
+            .value(contractAddress)
+        }.then(on: queue, { [weak self, queue] contractAddress -> Promise<[EventParserResultProtocol]> in
+            let key = "\(contractAddress.eip55String)-\(server.chainID)-\(eventName)-\(abiString)-\(try JSONEncoder().encode(filter.rpcPreEncode()).hashValue)"
+
+            if let promise = self?.inFlightPromises[key] {
+                return promise
+            } else {
+                let contractAddress = EthereumAddress(address: contractAddress)
+
+                guard let web3 = try? Web3.instance(for: server, timeout: 60) else {
+                    throw Web3Error(description: "Error creating web3 for: \(server.rpcURL) + \(server.chainID)")
+                }
+
+                guard let contract = Web3.Contract(web3: web3, abiString: abiString, at: contractAddress, options: web3.options) else {
+                    throw Web3Error(description: "Error creating web3swift contract instance to call \(eventName)()")
+                }
+
+                let promise = contract.getIndexedEventsPromise(eventName: eventName, filter: filter)
+                    .recover { error -> Promise<[EventParserResultProtocol]> in
+                        warnLog("[eth_getLogs] failure for server: \(server) with error: \(error)")
+                        return .init(error: error)
+                    }.ensure(on: queue, {
+                        self?.inFlightPromises[key] = .none
+                    })
+
+                self?.inFlightPromises[key] = promise
+                return promise
+            }
+        })
     }
-
-    guard let contract = Web3.Contract(web3: web3, abiString: abiString, at: contractAddress, options: web3.options) else {
-        return Promise(error: Web3Error(description: "Error creating web3swift contract instance to call \(eventName)()"))
-    }
-
-    return contract.getIndexedEventsPromise(eventName: eventName, filter: filter)
-        .recover { error -> Promise<[EventParserResultProtocol]> in
-            warnLog("[eth_getLogs] failure for server: \(server) with error: \(error)")
-            return .init(error: error)
-        }
 }

@@ -35,7 +35,7 @@ public protocol TokensDataStore: NSObjectProtocol {
 }
 
 extension TokensDataStore {
-    
+
     @discardableResult func updateToken(addressAndRpcServer: AddressAndRPCServer, action: TokenUpdateAction) -> Bool? {
         let primaryKey = TokenObject.generatePrimaryKey(fromContract: addressAndRpcServer.address, server: addressAndRpcServer.server)
         return updateToken(primaryKey: primaryKey, action: action)
@@ -67,17 +67,17 @@ extension TokensDataStore {
 }
 
 public enum TokenOrContract {
-    case ercToken(ERCToken)
+    case nonFungibleToken(ERCToken)
     case token(Token)
     case delegateContracts([AddressAndRPCServer])
     case deletedContracts([AddressAndRPCServer])
     /// We re-use the existing balance value to avoid the `Wallets` tab showing that token (if it already exist) as `balance = 0` momentarily
-    case fungibleTokenComplete(name: String, symbol: String, decimals: UInt8, contract: AlphaWallet.Address, server: RPCServer, onlyIfThereIsABalance: Bool)
+    case fungibleTokenComplete(name: String, symbol: String, decimals: Int, contract: AlphaWallet.Address, server: RPCServer, onlyIfThereIsABalance: Bool)
     case none
 
     var addressAndRPCServer: AddressAndRPCServer? {
         switch self {
-        case .ercToken(let eRCToken):
+        case .nonFungibleToken(let eRCToken):
             return .init(address: eRCToken.contract, server: eRCToken.server)
         case .token(let token):
             return .init(address: token.contractAddress, server: token.server)
@@ -142,7 +142,7 @@ public enum NonFungibleBalance {
     public struct NftAssetRawValue {
         public let json: JsonString
         public var source: Source = .undefined
-        
+
         public init(json: JsonString, source: Source) {
             self.json = json
             self.source = source
@@ -415,7 +415,7 @@ open class MultipleChainsTokensDataStore: NSObject, TokensDataStore {
                         let delegateContract = values.map { DelegateContract(contractAddress: $0.address, server: $0.server) }
 
                         realm.add(delegateContract, update: .all)
-                    case .ercToken(let token):
+                    case .nonFungibleToken(let token):
                         let tokenObject = MultipleChainsTokensDataStore.functional.createTokenObject(ercToken: token, shouldUpdateBalance: token.type.shouldUpdateBalanceWhenDetected)
                         self.addTokenWithoutCommitWrite(tokenObject: tokenObject, realm: realm)
                     case .token(let token):

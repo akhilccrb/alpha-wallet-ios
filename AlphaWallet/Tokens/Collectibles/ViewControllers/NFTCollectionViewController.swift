@@ -32,7 +32,7 @@ class NFTCollectionViewController: UIViewController {
     }()
 
     private lazy var collectionInfoPageView: NFTCollectionInfoPageView = {
-        let view = NFTCollectionInfoPageView(viewModel: viewModel.infoPageViewModel, keystore: keystore, session: session, assetDefinitionStore: assetDefinitionStore, analytics: analytics)
+        let view = NFTCollectionInfoPageView(viewModel: viewModel.infoPageViewModel, session: session, tokenCardViewFactory: tokenCardViewFactory)
         view.delegate = self
 
         return view
@@ -49,8 +49,6 @@ class NFTCollectionViewController: UIViewController {
     private let _pullToRefresh = PassthroughSubject<Void, Never>()
 
     private lazy var nftAssetsPageView: NFTAssetsPageView = {
-        let tokenCardViewFactory = TokenCardViewFactory(token: viewModel.token, assetDefinitionStore: assetDefinitionStore, analytics: analytics, keystore: keystore, wallet: viewModel.wallet)
-
         let view = NFTAssetsPageView(tokenCardViewFactory: tokenCardViewFactory, viewModel: viewModel.nftAssetsPageViewModel)
         view.delegate = self
         view.searchBar.delegate = self
@@ -64,11 +62,13 @@ class NFTCollectionViewController: UIViewController {
     }()
     private let keystore: Keystore
     private var cancellable = Set<AnyCancellable>()
+    private let tokenCardViewFactory: TokenCardViewFactory
 
     let viewModel: NFTCollectionViewModel
     weak var delegate: NFTCollectionViewControllerDelegate?
 
-    init(keystore: Keystore, session: WalletSession, assetDefinition: AssetDefinitionStore, analytics: AnalyticsLogger, viewModel: NFTCollectionViewModel, sessions: ServerDictionary<WalletSession>) {
+    init(keystore: Keystore, session: WalletSession, assetDefinition: AssetDefinitionStore, analytics: AnalyticsLogger, viewModel: NFTCollectionViewModel, sessions: ServerDictionary<WalletSession>, tokenCardViewFactory: TokenCardViewFactory) {
+        self.tokenCardViewFactory = tokenCardViewFactory
         self.viewModel = viewModel
         self.sessions = sessions
         self.session = session
@@ -77,8 +77,6 @@ class NFTCollectionViewController: UIViewController {
         self.keystore = keystore
 
         super.init(nibName: nil, bundle: nil)
-
-        hidesBottomBarWhenPushed = true
 
         let footerBar = ButtonsBarBackgroundView(buttonsBar: buttonsBar)
         let pageWithFooter = PageViewWithFooter(pageView: collectionInfoPageView, footerBar: footerBar)
@@ -89,9 +87,10 @@ class NFTCollectionViewController: UIViewController {
         view.addSubview(containerView)
         NSLayoutConstraint.activate([containerView.anchorsConstraint(to: view)])
 
-        navigationItem.largeTitleDisplayMode = .never
-
         keyboardChecker.constraints = containerView.bottomAnchorConstraints
+        navigationItem.largeTitleDisplayMode = .never
+        hidesBottomBarWhenPushed = true
+
         configure(nftAssetsPageView: nftAssetsPageView, viewModel: viewModel)
     }
 
@@ -102,8 +101,8 @@ class NFTCollectionViewController: UIViewController {
         case .assetSelection(let isEnabled):
             nftAssetsPageView.rightBarButtonItem = UIBarButtonItem.selectBarButton(self, selector: #selector(assetSelectionSelected))
             nftAssetsPageView.rightBarButtonItem?.isEnabled = isEnabled
-        case .assetsDisplayType(let selection):
-            let buttonItem = UIBarButtonItem.switchGridToListViewBarButton(selection: selection, self, selector: #selector(assetsDisplayTypeSelected))
+        case .assetsDisplayType(let layout):
+            let buttonItem = UIBarButtonItem.switchGridToListViewBarButton(gridOrListLayout: layout, self, selector: #selector(assetsDisplayTypeSelected))
 
             nftAssetsPageView.rightBarButtonItem = buttonItem
         }
@@ -160,25 +159,25 @@ class NFTCollectionViewController: UIViewController {
 
         let output = viewModel.transform(input: input)
 
-        output.viewState.sink { [weak self] state in
-            self?.title = state.title
-            self?.buildBarButtons(from: state.actions)
-        }.store(in: &cancellable)
+        output.viewState
+            .sink { [weak self] state in
+                self?.title = state.title
+                self?.buildBarButtons(from: state.actions)
+            }.store(in: &cancellable)
 
-        output.activities.sink { [weak activitiesPageView] viewModel in
-            activitiesPageView?.configure(viewModel: viewModel)
-        }.store(in: &cancellable)
+        output.activities
+            .sink { [weak activitiesPageView] in activitiesPageView?.configure(viewModel: $0) }
+            .store(in: &cancellable)
 
-        output.pullToRefreshState.sink { [refreshControl] state in
-            switch state {
-            case .idle:
-                break
-            case .endLoading:
-                refreshControl.endRefreshing()
-            case .beginLoading:
-                refreshControl.beginRefreshing()
-            }
-        }.store(in: &cancellable)
+        output.pullToRefreshState
+            .sink { [refreshControl] state in
+                switch state {
+                case .endLoading:
+                    refreshControl.endRefreshing()
+                case .beginLoading:
+                    refreshControl.beginRefreshing()
+                }
+            }.store(in: &cancellable)
     }
 
     //NOTE: there is only one possible action for now
@@ -250,8 +249,7 @@ extension NFTCollectionViewController: PagesContainerViewDelegate {
     }
 
     @objc private func assetsDisplayTypeSelected(_ sender: UIBarButtonItem) {
-        let selection = nftAssetsPageView.viewModel.selection
-        nftAssetsPageView.viewModel.set(selection: sender.selection ?? selection)
+        nftAssetsPageView.viewModel.set(layout: sender.gridOrListLayout ?? nftAssetsPageView.viewModel.layout)
         sender.toggleSelection()
     }
 }

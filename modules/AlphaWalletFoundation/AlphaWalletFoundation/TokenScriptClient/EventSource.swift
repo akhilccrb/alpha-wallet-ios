@@ -6,8 +6,8 @@ import PromiseKit
 import Combine
 import AlphaWalletWeb3
 
-public final class EventSource: NSObject {
-    private var wallet: Wallet
+final class EventSource: NSObject {
+    private let wallet: Wallet
     private let assetDefinitionStore: AssetDefinitionStore
     private let eventsDataStore: NonActivityEventsDataStore
     private let config: Config
@@ -17,18 +17,20 @@ public final class EventSource: NSObject {
     private let enabledServers: [RPCServer]
     private var cancellable = Set<AnyCancellable>()
     private let tokensService: TokenProvidable
+    private let eventFetcher: EventFetcher
 
-    public init(wallet: Wallet, tokensService: TokenProvidable, assetDefinitionStore: AssetDefinitionStore, eventsDataStore: NonActivityEventsDataStore, config: Config) {
+    init(wallet: Wallet, tokensService: TokenProvidable, assetDefinitionStore: AssetDefinitionStore, eventsDataStore: NonActivityEventsDataStore, config: Config, getEventLogs: GetEventLogs) {
         self.wallet = wallet
         self.assetDefinitionStore = assetDefinitionStore
         self.eventsDataStore = eventsDataStore
         self.config = config
         self.enabledServers = config.enabledServers
         self.tokensService = tokensService
+        self.eventFetcher = EventFetcher(getEventLogs: getEventLogs, wallet: wallet)
         super.init()
     }
 
-    public func start() {
+    func start() {
         guard !config.development.isAutoFetchingDisabled else { return }
 
         subscribeForTokenChanges()
@@ -38,9 +40,8 @@ public final class EventSource: NSObject {
     private func subscribeForTokenChanges() {
         tokensService.tokensPublisher(servers: enabledServers)
             .receive(on: queue)
-            .sink { [weak self] _ in
-                self?.fetchEthereumEvents()
-            }.store(in: &cancellable)
+            .sink { [weak self] _ in self?.fetchAllEvents() }
+            .store(in: &cancellable)
     }
 
     private func subscribeForTokenScriptFileChanges() {
@@ -48,13 +49,19 @@ public final class EventSource: NSObject {
         assetDefinitionStore.bodyChange
             .receive(on: queue)
             .compactMap { [tokensService] in tokensService.token(for: $0) }
-            .sink { [weak self] token in
-                guard let strongSelf = self else { return }
+            .sink { [weak self] in self?.fetchEvents(for: $0) }
+            .store(in: &cancellable)
+    }
 
-                for each in strongSelf.fetchMappedContractsAndServers(token: token) {
-                    strongSelf.fetchEvents(forTokenContract: each.contract, server: each.server)
-                }
-            }.store(in: &cancellable)
+    private func fetchEvents(for token: Token) {
+        for each in fetchMappedContractsAndServers(token: token) {
+            guard let token = tokensService.token(for: each.contract, server: each.server) else { return }
+            eventsDataStore.deleteEvents(for: each.contract)
+
+            fetchEventsByTokenId(for: token)
+                .done { _ in }
+                .cauterize()
+        }
     }
 
     private func fetchMappedContractsAndServers(token: Token) -> [(contract: AlphaWallet.Address, server: RPCServer)] {
@@ -69,15 +76,6 @@ public final class EventSource: NSObject {
         }
 
         return values
-    }
-
-    private func fetchEvents(forTokenContract contract: AlphaWallet.Address, server: RPCServer) {
-        guard let token = tokensService.token(for: contract, server: server) else { return }
-        eventsDataStore.deleteEvents(for: contract)
-
-        when(resolved: fetchEventsByTokenId(forToken: token))
-            .done { _ in }
-            .cauterize()
     }
 
     private func getEventOriginsAndTokenIds(forToken token: Token) -> [(eventOrigin: EventOrigin, tokenIds: [TokenId])] {
@@ -97,20 +95,26 @@ public final class EventSource: NSObject {
         return cards
     }
 
-    private func fetchEventsByTokenId(forToken token: Token) -> [Promise<Void>] {
-        return getEventOriginsAndTokenIds(forToken: token)
+    private func fetchEventsByTokenId(for token: Token) -> Promise<Void> {
+        let promises = getEventOriginsAndTokenIds(forToken: token)
             .flatMap { value in
-                value.tokenIds.map {
-                    EventSource.functional.fetchEvents(forTokenId: $0, token: token, eventOrigin: value.eventOrigin, wallet: wallet, eventsDataStore: eventsDataStore, queue: queue)
+                value.tokenIds.map { tokenId -> Promise<Void> in
+                    let eventOrigin = value.eventOrigin
+                    let oldEvent = eventsDataStore.getLastMatchingEventSortedByBlockNumber(for: eventOrigin.contract, tokenContract: token.contractAddress, server: token.server, eventName: eventOrigin.eventName)
+                    return eventFetcher.fetchEvents(tokenId: tokenId, token: token, eventOrigin: eventOrigin, oldEvent: oldEvent)
+                        .map(on: queue, { [eventsDataStore] events in
+                            eventsDataStore.addOrUpdate(events: events)
+                        })
                 }
             }
+        return when(resolved: promises).map { _ in }
     }
 
-    private func fetchEthereumEvents() {
+    private func fetchAllEvents() {
         if rateLimitedUpdater == nil {
             rateLimitedUpdater = RateLimiter(name: "Poll Ethereum events for instances", limit: 15, autoRun: true) { [weak self] in
                 self?.queue.async {
-                    self?.fetchEthereumEventsImpl()
+                    self?.fetchAllEventsImpl()
                 }
             }
         } else {
@@ -118,11 +122,11 @@ public final class EventSource: NSObject {
         }
     }
 
-    private func fetchEthereumEventsImpl() {
+    private func fetchAllEventsImpl() {
         guard !isFetching else { return }
         isFetching = true
 
-        let promises = tokensService.tokens(for: enabledServers).map { fetchEventsByTokenId(forToken: $0) }.flatMap { $0 }
+        let promises = tokensService.tokens(for: enabledServers).map { fetchEventsByTokenId(for: $0) }.flatMap { $0 }
         when(resolved: promises).done { [weak self] _ in
             self?.isFetching = false
         }
@@ -135,38 +139,6 @@ extension EventSource {
 
 extension EventSource.functional {
 
-    static func fetchEvents(forTokenId tokenId: TokenId, token: Token, eventOrigin: EventOrigin, wallet: Wallet, eventsDataStore: NonActivityEventsDataStore, queue: DispatchQueue) -> Promise<Void> {
-        let (filterName, filterValue) = eventOrigin.eventFilter
-        let filterParam = eventOrigin
-            .parameters
-            .filter { $0.isIndexed }
-            .map { Self.formFilterFrom(fromParameter: $0, tokenId: tokenId, filterName: filterName, filterValue: filterValue, wallet: wallet) }
-
-        let oldEvent = eventsDataStore
-            .getLastMatchingEventSortedByBlockNumber(for: eventOrigin.contract, tokenContract: token.contractAddress, server: token.server, eventName: eventOrigin.eventName)
-        let fromBlock: EventFilter.Block
-        if let newestEvent = oldEvent {
-            fromBlock = .blockNumber(UInt64(newestEvent.blockNumber + 1))
-        } else {
-            fromBlock = .blockNumber(0)
-        }
-        let addresses = [EthereumAddress(address: eventOrigin.contract)]
-        let parameterFilters = filterParam.map { $0?.filter }
-
-        let eventFilter = EventFilter(fromBlock: fromBlock, toBlock: .latest, addresses: addresses, parameterFilters: parameterFilters)
-
-        return getEventLogs(withServer: token.server, contract: eventOrigin.contract, eventName: eventOrigin.eventName, abiString: eventOrigin.eventAbiString, filter: eventFilter)
-        .done(on: queue, { result -> Void in
-            let events = result.compactMap {
-                Self.convertEventToDatabaseObject($0, filterParam: filterParam, eventOrigin: eventOrigin, contractAddress: token.contractAddress, server: token.server)
-            }
-
-            eventsDataStore.addOrUpdate(events: events)
-        }).recover(on: queue, { e in
-            logError(e, rpcServer: token.server, address: token.contractAddress)
-        })
-    }
-
     static func convertToImplicitAttribute(string: String) -> AssetImplicitAttributes? {
         let prefix = "${"
         let suffix = "}"
@@ -175,7 +147,7 @@ extension EventSource.functional {
         return AssetImplicitAttributes(rawValue: value)
     }
 
-    private static func convertEventToDatabaseObject(_ event: EventParserResultProtocol, filterParam: [(filter: [EventFilterable], textEquivalent: String)?], eventOrigin: EventOrigin, contractAddress: AlphaWallet.Address, server: RPCServer) -> EventInstanceValue? {
+    static func convertEventToDatabaseObject(_ event: EventParserResultProtocol, filterParam: [(filter: [EventFilterable], textEquivalent: String)?], eventOrigin: EventOrigin, contractAddress: AlphaWallet.Address, server: RPCServer) -> EventInstanceValue? {
         guard let blockNumber = event.eventLog?.blockNumber else { return nil }
         guard let logIndex = event.eventLog?.logIndex else { return nil }
         let decodedResult = Self.convertToJsonCompatible(dictionary: event.decodedResult)
@@ -187,7 +159,7 @@ extension EventSource.functional {
         return EventInstanceValue(contract: eventOrigin.contract, tokenContract: contractAddress, server: server, eventName: eventOrigin.eventName, blockNumber: Int(blockNumber), logIndex: Int(logIndex), filter: filterText, json: json)
     }
 
-    private static func formFilterFrom(fromParameter parameter: EventParameter, tokenId: TokenId, filterName: String, filterValue: String, wallet: Wallet) -> (filter: [EventFilterable], textEquivalent: String)? {
+    static func formFilterFrom(fromParameter parameter: EventParameter, tokenId: TokenId, filterName: String, filterValue: String, wallet: Wallet) -> (filter: [EventFilterable], textEquivalent: String)? {
         guard parameter.name == filterName else { return nil }
         guard let parameterType = SolidityType(rawValue: parameter.type) else { return nil }
         let optionalFilter: (filter: AssetAttributeValueUsableAsFunctionArguments, textEquivalent: String)?

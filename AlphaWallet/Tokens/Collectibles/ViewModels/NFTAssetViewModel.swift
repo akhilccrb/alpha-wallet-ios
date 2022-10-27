@@ -31,16 +31,15 @@ class NFTAssetViewModel {
     private let displayHelper: OpenSeaNonFungibleTokenDisplayHelper
     private let tokenHolderHelper: TokenInstanceViewConfigurationHelper
     private let nftProvider: NFTProvider
-    private let session: WalletSession
     private let mode: TokenInstanceViewMode
     private let service: TokenViewModelState & TokenHolderState
     private (set) var viewTypes: [NFTAssetViewModel.ViewType] = []
-
+    let session: WalletSession
     let token: Token
     private (set) var tokenId: TokenId
     private (set) var tokenHolder: TokenHolder
     let assetDefinitionStore: AssetDefinitionStore
-    var backgroundColor: UIColor = Colors.appBackground
+    var backgroundColor: UIColor = Configuration.Color.Semantic.defaultViewBackground
     var transferTransactionType: TransactionType {
         tokenHolder.select(with: .allFor(tokenId: tokenHolder.tokenId))
         return TransactionType(nonFungibleToken: token, tokenHolders: [tokenHolder])
@@ -74,7 +73,7 @@ class NFTAssetViewModel {
 
     var previewViewContentBackgroundColor: UIColor {
         if displayHelper.imageHasBackgroundColor {
-            return Colors.appBackground
+            return Configuration.Color.Semantic.defaultViewBackground
         } else {
             if let color = tokenHolder.values.backgroundColorStringValue.nilIfEmpty {
                 return UIColor(hex: color)
@@ -144,8 +143,8 @@ class NFTAssetViewModel {
     }
 
     private func configure(overiddenOpenSeaStats: Stats?) {
-        self.tokenHolderHelper.overridenFloorPrice = overiddenOpenSeaStats?.floorPrice
-        self.tokenHolderHelper.overridenItemsCount = overiddenOpenSeaStats?.itemsCount
+        tokenHolderHelper.overridenFloorPrice = overiddenOpenSeaStats?.floorPrice
+        tokenHolderHelper.overridenItemsCount = overiddenOpenSeaStats?.itemsCount
     }
 
     var actions: [TokenInstanceAction] {

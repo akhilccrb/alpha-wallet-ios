@@ -17,7 +17,6 @@ extension NSNotification.Name {
 protocol NFTAssetsPageViewDelegate: class {
     func nftAssetsPageView(_ view: NFTAssetsPageView, didSelectTokenHolder tokenHolder: TokenHolder)
 }
-typealias TokenHoldersDataSource = UICollectionViewDiffableDataSource<NFTAssetsPageViewModel.AssetsSection, TokenHolder>
 
 class NFTAssetsPageView: UIView, PageViewType {
     private lazy var gridLayout: UICollectionViewLayout = {
@@ -51,13 +50,11 @@ class NFTAssetsPageView: UIView, PageViewType {
         return searchBar
     }()
 
-    private lazy var dataSource: TokenHoldersDataSource = makeDataSource()
+    private lazy var dataSource: DataSource = makeDataSource()
     private let appear = PassthroughSubject<Void, Never>()
     private var cancelable = Set<AnyCancellable>()
 
-    var title: String {
-        viewModel.title
-    }
+    var title: String { viewModel.title }
     let viewModel: NFTAssetsPageViewModel
     weak var delegate: NFTAssetsPageViewDelegate?
     var rightBarButtonItem: UIBarButtonItem?
@@ -86,7 +83,7 @@ class NFTAssetsPageView: UIView, PageViewType {
         ])
         fixCollectionViewBackgroundColor()
 
-        applyLayout(viewModel.selection)
+        applyLayout(viewModel.layout)
 
         emptyView = EmptyView.filterTokenHoldersEmptyView()
         bind(viewModel: viewModel)
@@ -110,36 +107,26 @@ class NFTAssetsPageView: UIView, PageViewType {
 
         let output = viewModel.transform(input: input)
 
-        output.viewState.sink { [weak self] state in
+        output.viewState.sink { [weak self, dataSource] state in
             self?.startLoading(animated: false)
-            self?.invalidateDataSource(with: state)
+            dataSource.apply(state.snapshot, animatingDifferences: state.animatingDifferences)
+            self?.invalidateLayout()
             self?.endLoading(animated: false)
         }.store(in: &cancelable)
 
-        output.selection.sink { [weak self] selection in
-            self?.configureLayout(selection: selection)
-        }.store(in: &cancelable)
+        output.layout
+            .sink { [weak self] in self?.configureLayout(layout: $0) }
+            .store(in: &cancelable)
     }
 
-    private func invalidateDataSource(with state: NFTAssetsPageViewModel.ViewState) {
-        var snapshot = NSDiffableDataSourceSnapshot<NFTAssetsPageViewModel.AssetsSection, TokenHolder>()
-        snapshot.appendSections(state.sections.map { $0.section })
-        for section in state.sections {
-            snapshot.appendItems(section.views)
-        }
-
-        dataSource.apply(snapshot, animatingDifferences: state.animatingDifferences)
-        invalidateLayout()
-    }
-
-    private func configureLayout(selection: GridOrListSelectionState) {
-        applyLayout(selection)
+    private func configureLayout(layout: GridOrListLayout) {
+        applyLayout(layout)
         invalidateLayout()
 
-        NotificationCenter.default.post(name: .invalidateLayout, object: collectionView, userInfo: ["selection": selection])
+        NotificationCenter.default.post(name: .invalidateLayout, object: collectionView, userInfo: ["layout": layout])
     }
 
-    private func applyLayout(_ selection: GridOrListSelectionState) {
+    private func applyLayout(_ selection: GridOrListLayout) {
         switch selection {
         case .grid:
             collectionView.collectionViewLayout = gridLayout
@@ -188,15 +175,15 @@ extension NFTAssetsPageView: UICollectionViewDelegate {
     }
 }
 extension NFTAssetsPageView {
-    func makeDataSource() -> UICollectionViewDiffableDataSource<NFTAssetsPageViewModel.AssetsSection, TokenHolder> {
-        TokenHoldersDataSource(collectionView: collectionView) { [weak self] cv, indexPath, tokenHolder -> ContainerCollectionViewCell? in
-            guard let strongSelf = self else { return nil }
+    private typealias DataSource = UICollectionViewDiffableDataSource<NFTAssetsPageViewModel.Section, TokenHolder>
 
+    private func makeDataSource() -> DataSource {
+        DataSource(collectionView: collectionView) { [viewModel, tokenCardViewFactory] cv, indexPath, tokenHolder -> ContainerCollectionViewCell? in
             let cell: ContainerCollectionViewCell = cv.dequeueReusableCell(for: indexPath)
-            ContainerCollectionViewCell.configureSeparatorLines(selection: strongSelf.viewModel.selection, cell)
+            ContainerCollectionViewCell.configureSeparatorLines(layout: viewModel.layout, cell)
             cell.containerEdgeInsets = .zero
 
-            let subview: TokenCardViewType = strongSelf.tokenCardViewFactory.create(for: tokenHolder, layout: strongSelf.viewModel.selection, gridEdgeInsets: .zero)
+            let subview: TokenCardViewRepresentable = tokenCardViewFactory.createTokenCardView(for: tokenHolder, layout: viewModel.layout, gridEdgeInsets: .zero)
             subview.configure(tokenHolder: tokenHolder, tokenId: tokenHolder.tokenId)
 
             cell.configure(subview: subview)
