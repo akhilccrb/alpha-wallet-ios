@@ -248,6 +248,8 @@ extension BrowserViewController: WKNavigationDelegate {
 
 extension BrowserViewController: WKScriptMessageHandler {
     func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+        
+        print("userContentController in BrowserViewController", message.body, message.name)
         guard let command = DappAction.fromMessage(message) else {
             if message.name == Browser.locationChangedEventName {
                 recordURL()
